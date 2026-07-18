@@ -138,10 +138,16 @@ docker compose -f .\docker-compose.yml down -v --remove-orphans
 
 ## 一键复现
 
-下面命令会依次执行环境检查、双链路构建和自动对账：
+下面命令会依次执行环境检查、双链路构建和自动对账；对账通过后还会校验当前作业确实包含预期的 6 个 sink，并要求 Flink 恰有 1 个 `RUNNING` 作业、9 个 tasks 全部处于 `RUNNING` 或正常 `FINISHED` 状态、最近 2 次 checkpoint 连续成功、基线后至少新完成 1 次 checkpoint、无执行异常且门禁观察期无新增 checkpoint 失败；最后验证 TaskManager Java 进程实际以 `9999:9999` 运行，再以该身份检查 5 个 Paimon bucket 可写，并确认每个 bucket 都有当前作业启动后生成的非空数据文件：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\run-demo.ps1 -Reset
+```
+
+运行态门禁也可以单独执行：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\verify-flink-paimon.ps1
 ```
 
 仓库结构和确定性样例数据可以单独做静态校验：

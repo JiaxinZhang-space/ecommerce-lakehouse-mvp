@@ -108,3 +108,27 @@ WITH (
 - 排查过程：在首次完整复验的第 3 次轮询中稳定捕获到“展示仍缺实时数据、紧接着判定通过”的矛盾输出。
 - 最终方案：只执行一次 `--batch --raw --skip-column-names` 查询，将同一批行解析成结构化对象；同一快照同时负责逐指标输出和 PASS/FAIL 判定。
 - 预防建议：自动验收中的展示、判定和归档必须来自同一次查询快照，尤其不能在异步 Sink 正在收敛时重复查询后混用结果。
+
+## 2026-07-18 Doris 对账通过但未证明 Flink/Paimon 稳定
+
+- 问题场景：旧一键脚本在 Doris 指标首次 `PASS` 后立即成功，未检查 checkpoint 历史，也未证明五个 Paimon bucket 由 Flink 运行用户实际写入；预创建目录如果归 root 所有，还可能在后续 checkpoint 才暴露权限错误。
+- 最终方案：先由 root 初始化目录并 `chown -R 9999:9999`，再以 `9999:9999` 提交 SQL；最终门禁要求 1 个 `RUNNING` 作业、9 个 tasks 全部 `RUNNING` 或正常 `FINISHED`、最近 2 次 checkpoint 连续成功、无执行异常且门禁观察期无新增失败，并对五个 bucket 做同 UID/GID 的写入探测及数据文件检查。
+- 预防建议：实时链路验收必须同时覆盖业务结果、计算状态、checkpoint 和存储落盘，不能把下游表短暂出现正确结果等同于作业稳定。
+
+## 2026-07-18 旧 Paimon 文件可能误充当前作业证据
+
+- 问题场景：只验证“唯一 RUNNING 作业 + 9 个 tasks + bucket 内存在任意 `data-*`”时，保留旧 volume 的情况下，无关作业可能与上次遗留文件拼出假阳性；显式指定 `--user 9999:9999` 后再执行 `id` 也只能自证参数，不能证明 TaskManager Java 进程身份。
+- 最终方案：验证活动作业名同时包含本项目 5 个 Paimon sink 和 1 个 Doris sink；用 `ps` 直接读取 TaskManager Java 进程 UID/GID，再以该身份探测目录；数据文件必须非空，且修改时间不早于当前 Flink Job 的 `start-time`。
+- 预防建议：状态、进程身份和存储证据都应与同一轮作业建立时间或标识关联，不能仅检查共享环境中的“存在性”。
+
+## 2026-07-18 生命周期累计计数造成运行态门禁假阴性
+
+- 问题场景：Flink 在全部 tasks 就绪前有一次 checkpoint trigger failure，但无 root exception，随后 checkpoint 1—16 连续完成；同时 bounded Values source 正常完成后表现为 8 个 `RUNNING` 加 1 个 `FINISHED` task。把生命周期失败累计数和 `9/9 RUNNING` 当作稳定性条件会误判。
+- 最终方案：要求 `total=9`、`running + finished=9` 且 failed/canceled/canceling tasks 均为 0；以首次就绪时的 checkpoint failed count 和最新 completed checkpoint ID 为观察基线，要求最近两条 history 均为 `COMPLETED`、基线后至少新完成一次 checkpoint、`latest.failed` 为空、无 root exception，并确保观察期 failed count 未增长。
+- 预防建议：门禁应区分启动期历史噪声与观察期新增故障；对 bounded source 也应把正常 `FINISHED` 视为健康 task 状态。
+
+## 2026-07-18 Windows PowerShell 破坏 `docker exec` 的长 Bash 参数
+
+- 问题场景：把包含命令替换、数组和多层引号的完整 Bash 程序作为 `bash -lc` 单参数从 Windows PowerShell 传给 `docker compose exec`，容器实际收到的字符串被拆坏并报 `unexpected EOF`。
+- 最终方案：删除长 Bash 字符串，PowerShell 分别执行 `id`、`test`、`touch`、`rm` 和 `find`；每次原生命令后立即保存并检查 `$LASTEXITCODE`，再在 PowerShell 中判断 UID/GID 和 `find` 输出。
+- 预防建议：Windows 到容器的自动化优先使用结构简单的直接参数调用；需要多个验证步骤时由 PowerShell 编排，不跨越两层 shell 传递复杂脚本。

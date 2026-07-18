@@ -20,7 +20,7 @@ $requiredFiles = @(
     "sql/doris/20_realtime_sink.sql",
     "sql/doris/90_compare.sql",
     "sql/flink/01_paimon_realtime.sql",
-    "scripts/native-command.ps1"
+    "scripts/verify-flink-paimon.ps1"
 )
 
 $missing = @(
