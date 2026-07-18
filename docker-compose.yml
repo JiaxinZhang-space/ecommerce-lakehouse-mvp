@@ -1,0 +1,132 @@
+name: ecommerce-lakehouse-mvp
+
+services:
+  mysql:
+    image: mysql:8.0
+    hostname: mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: ecommerce_oltp
+      TZ: Asia/Shanghai
+    command:
+      - "--server-id=1"
+      - "--log-bin=mysql-bin"
+      - "--binlog-format=ROW"
+      - "--binlog-row-image=FULL"
+      - "--default-authentication-plugin=mysql_native_password"
+    ports:
+      - "127.0.0.1:3307:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./sql/mysql:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h127.0.0.1 -uroot -proot --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    networks:
+      - lakehouse
+
+  doris:
+    image: apache/doris:2.1.9-all
+    hostname: doris
+    environment:
+      SKIP_CHECK_ULIMIT: "true"
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    ports:
+      - "127.0.0.1:8030:8030"
+      - "127.0.0.1:8040:8040"
+      - "127.0.0.1:9030:9030"
+    healthcheck:
+      test: ["CMD-SHELL", "mysql -h127.0.0.1 -P9030 -uroot -e 'select 1' >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+    networks:
+      - lakehouse
+
+  kafka:
+    image: apache/kafka:3.9.1
+    hostname: kafka
+    ports:
+      - "127.0.0.1:9094:9094"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_LISTENERS: PLAINTEXT://kafka:9092,CONTROLLER://kafka:9093,EXTERNAL://0.0.0.0:9094
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://localhost:9094
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+    volumes:
+      - kafka-data:/tmp/kraft-combined-logs
+    networks:
+      - lakehouse
+
+  jobmanager:
+    build:
+      context: .
+      dockerfile: docker/flink/Dockerfile
+    hostname: jobmanager
+    command: jobmanager
+    ports:
+      - "127.0.0.1:8081:8081"
+    environment:
+      FLINK_PROPERTIES: |
+        jobmanager.rpc.address: jobmanager
+        parallelism.default: 1
+        taskmanager.numberOfTaskSlots: 2
+        execution.checkpointing.interval: 10s
+    volumes:
+      - ./sql:/opt/flink/usrlib/sql
+      - paimon-warehouse:/warehouse/paimon
+    depends_on:
+      - kafka
+    networks:
+      - lakehouse
+
+  taskmanager:
+    build:
+      context: .
+      dockerfile: docker/flink/Dockerfile
+    hostname: taskmanager
+    command: taskmanager
+    environment:
+      FLINK_PROPERTIES: |
+        jobmanager.rpc.address: jobmanager
+        parallelism.default: 1
+        taskmanager.numberOfTaskSlots: 2
+        taskmanager.memory.process.size: 1536m
+        execution.checkpointing.interval: 10s
+    volumes:
+      - ./sql:/opt/flink/usrlib/sql
+      - paimon-warehouse:/warehouse/paimon
+    depends_on:
+      - jobmanager
+    networks:
+      - lakehouse
+
+  mysql-client:
+    image: mysql:8.0
+    profiles: ["tools"]
+    entrypoint: ["mysql"]
+    networks:
+      - lakehouse
+
+volumes:
+  mysql-data:
+  kafka-data:
+  paimon-warehouse:
+
+networks:
+  lakehouse:

@@ -1,0 +1,19 @@
+name: repository-checks
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  static-validation:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate repository structure and demo data
+        shell: pwsh
+        run: ./scripts/validate-repo.ps1
+
+      - name: Validate Docker Compose syntax
+        run: docker compose config --quiet

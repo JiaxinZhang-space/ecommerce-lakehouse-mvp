@@ -1,0 +1,25 @@
+# Operating systems and editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Build and runtime artifacts
+target/
+.tmp/
+*.class
+*.jar
+*.log
+*.tmp
+README.before-*
+
+# Local Docker/runtime data
+docker-data/
+warehouse/
