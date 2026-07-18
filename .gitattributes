@@ -4,3 +4,7 @@
 *.png binary
 *.jar binary
 *.zip binary
+
+# GitHub Linguist language statistics
+*.sql linguist-language=SQL linguist-detectable
+scripts/*.ps1 linguist-vendored
