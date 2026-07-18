@@ -10,7 +10,7 @@
 
 ## 当前状态
 
-独立目录的静态整理、技术问题修正和空数据卷完整复现均已完成，可以进入本地提交和 `v1.0.0` 候选标签阶段；远端仓库尚未创建。
+独立目录的静态整理、技术问题修正、空数据卷完整复现与提交后 fresh-clone 复验均已完成，可以进入 `v1.0.0` 标签阶段；远端仓库尚未创建。
 
 ## 2026-07-18 实测结果
 
@@ -32,6 +32,19 @@
 - 随后的空卷复验使用该已校验镜像。
 
 本机 `vm.max_map_count` 为 `262144`，低于 Doris 严格安装建议；本地 Compose 使用 `SKIP_CHECK_ULIMIT=true`，本轮仍成功跑通。生产环境或严格验收环境应调整为 `>= 2000000`。
+
+## 提交后 fresh-clone 复验
+
+- 被验证提交：`d0b6111be6da5bfc752b223f76a57ee504184415`
+- 新 clone 目录：`D:\Projects\story\tmp\ecommerce-lakehouse-mvp-fresh-clone-20260718`
+- 运行开始：`2026-07-18 16:27:58`
+- 运行结束：`2026-07-18 16:30:18`
+- 退出状态：后台进程正常退出，`run-demo.ps1` 输出 `End-to-end demo passed on attempt 2`
+- Flink Job ID：`fad0fe7a3bb479f10fa227d5e94fd2ee`
+- Flink REST：仅 1 个作业，状态 `RUNNING`，9 / 9 tasks 运行
+- Git：fresh-clone 工作树保持干净
+
+第 1 次单次快照查询发生在实时 Sink 完成前，三行均为 `MISSING_REALTIME`；脚本等待 5 秒后重新取得第 2 个完整快照，三行六项指标全部 `PASS`。每一轮的展示和判定均来自同一次查询，没有再出现双查询竞态。
 
 ## 预期指标
 
