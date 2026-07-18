@@ -34,6 +34,7 @@
 - 建议内存：16GB+
 - 建议空闲磁盘：50GB+
 - Doris 严格安装建议 `vm.max_map_count >= 2000000`；本地演示 Compose 使用 `SKIP_CHECK_ULIMIT=true`
+- Compose 中的 MySQL `root/root` 是仅供确定性本地演示使用的公开固定凭据，端口只绑定 `127.0.0.1`；它不是秘密，也不得复用于共享、测试或生产环境
 
 本地演示已在较低值下跑通，但生产环境或严格环境验收仍应在管理员终端或 Docker Desktop WSL context 中执行：
 

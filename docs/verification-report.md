@@ -11,9 +11,8 @@
 
 ## 当前状态
 
-独立目录已完成静态校验、空卷运行、权限修复和运行态门禁验证。修复后的完整提交仍需再从全新 clone 执行一次 `run-demo.ps1 -Reset`；本报告不会把修复前只有 Doris 对账通过的结果写成最终成功。
+代码提交 `8b74f5fbf67539020747f7ba293bbfd628ee34ce` 已从全新 clone 完整执行 `run-demo.ps1 -Reset` 并通过业务对账与运行态门禁；其后的文档提交只补充本报告，`v1.0.0` 指向包含该报告的发布树。远端发布状态以 GitHub 仓库为准。
 
-远端发布状态以 GitHub 仓库为准。
 
 ## 已作废的早期验收
 
@@ -51,11 +50,31 @@ Flink 在全部 tasks 就绪前可能出现一次 `Not all required tasks are cu
 - task 状态：8 个 `RUNNING`，1 个 bounded Values source 正常 `FINISHED`，总计 9 个
 - 门禁通过时 completed checkpoint：92
 - 启动期失败基线：1；门禁观察期新增失败：0
-- root execution exception：无
+- execution exception history：无
 - Paimon：5 / 5 bucket 可写且均存在由 `flink:flink` 创建的 `data-*` ORC 文件
 - Doris：固定 1 / 7 / 30 日统计范围六项指标全部 `PASS`
 
-本轮从空卷启动后，旧版严格门禁因把启动期 trigger failure 计入生命周期失败而主动退出；调整为上述判定语义后，针对同一稳定作业单独执行新门禁并通过。最终发布前仍需由全新 clone 对完整一键脚本进行一次端到端复验。
+本轮从空卷启动后，旧版严格门禁因把启动期 trigger failure 计入生命周期失败而主动退出；调整为上述判定语义后，针对同一稳定作业单独执行新门禁并通过。该结果只用于门禁开发，不作为最终发布验收。
+
+## 最终 fresh-clone 端到端复验
+
+- 被验证提交：`8b74f5fbf67539020747f7ba293bbfd628ee34ce`
+- 新 clone 目录：`D:\Projects\story\tmp\ecommerce-lakehouse-mvp-final-fresh-clone2-20260718`
+- `run-demo.ps1 -Reset` 开始：`2026-07-18 17:49:19`
+- 完成：`2026-07-18 17:53:08`，最终输出端到端成功信息
+- Flink Job ID：`cd5f5270b2a7a212fa40845e7d08f256`
+- 作业状态：`RUNNING`
+- task 状态：8 个 `RUNNING`，1 个 bounded Values source 正常 `FINISHED`，总计 9 个
+- checkpoint：门禁基线为 completed `1` / failed `1`；放行时 completed `2` / failed `1`，观察期无新增失败
+- execution exception：root、all-exceptions 与 exception history 均为空
+- Paimon：5 / 5 bucket 可写，且均存在当前 Job 启动后由 `flink:flink` 生成的非空 ORC 数据文件
+- Doris：固定 1 / 7 / 30 日统计范围六项指标全部 `PASS`
+- Git：fresh clone 工作树保持干净
+
+日志：
+
+- `D:\Projects\story\tmp\ecommerce-final-fresh-run3.stdout.log`
+- `D:\Projects\story\tmp\ecommerce-final-fresh-run3.stderr.log`
 
 ## 构建供应链验证
 
